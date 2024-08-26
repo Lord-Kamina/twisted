@@ -22,7 +22,11 @@ from twisted.internet.abstract import FileDescriptor
 from twisted.internet.interfaces import IReactorFDSet, IReadDescriptor, IWriteDescriptor
 from twisted.python import log
 from twisted.python.monkey import MonkeyPatcher
-from ._signals import _IWaker, _UnixWaker
+from twisted.python.runtime import platformType
+from ._signals import _IWaker, _Waker
+
+if platformType == "posix":
+    from ._signals import _UnixWaker
 
 
 def ensureNotImported(moduleNames, errorMessage, preventImports=[]):
@@ -52,18 +56,18 @@ def ensureNotImported(moduleNames, errorMessage, preventImports=[]):
         sys.modules[name] = None
 
 
-class GlibWaker(_UnixWaker):
-    """
-    Run scheduled events after waking up.
-    """
+class GlibWaker(_Waker):
+	"""
+	Run scheduled events after waking up.
+	"""
 
-    def __init__(self, reactor):
-        super().__init__()
-        self.reactor = reactor
+	def __init__(self, reactor):
+		super().__init__()
+		self.reactor = reactor
 
-    def doRead(self) -> None:
-        super().doRead()
-        self.reactor._simulate()
+	def doRead(self) -> None:
+		super().doRead()
+		self.reactor._simulate()
 
 
 def _signalGlue():
