@@ -22,7 +22,11 @@ from twisted.internet.abstract import FileDescriptor
 from twisted.internet.interfaces import IReactorFDSet, IReadDescriptor, IWriteDescriptor
 from twisted.python import log
 from twisted.python.monkey import MonkeyPatcher
-from ._signals import _IWaker, _UnixWaker
+from twisted.python.runtime import platformType
+from ._signals import _IWaker
+
+if platformType == "posix":
+    from ._signals import _UnixWaker
 
 
 def ensureNotImported(moduleNames, errorMessage, preventImports=[]):
@@ -52,18 +56,19 @@ def ensureNotImported(moduleNames, errorMessage, preventImports=[]):
         sys.modules[name] = None
 
 
-class GlibWaker(_UnixWaker):
-    """
-    Run scheduled events after waking up.
-    """
+if platformType == "posix":
+    class GlibWaker(_UnixWaker):
+        """
+        Run scheduled events after waking up.
+        """
 
-    def __init__(self, reactor):
-        super().__init__()
-        self.reactor = reactor
+        def __init__(self, reactor):
+            super().__init__()
+            self.reactor = reactor
 
-    def doRead(self) -> None:
-        super().doRead()
-        self.reactor._simulate()
+        def doRead(self) -> None:
+            super().doRead()
+            self.reactor._simulate()
 
 
 def _signalGlue():
@@ -129,8 +134,9 @@ class GlibReactorBase(posixbase.PosixReactorBase, posixbase._PollLikeMixin):
 
     # Install a waker that knows it needs to call C{_simulate} in order to run
     # callbacks queued from a thread:
-    def _wakerFactory(self) -> _IWaker:
-        return GlibWaker(self)
+    if platformType == "posix":
+        def _wakerFactory(self) -> _IWaker:
+            return GlibWaker(self)
 
     def __init__(self, glib_module: Any, gtk_module: Any, useGtk: bool = False) -> None:
         self._simtag = None

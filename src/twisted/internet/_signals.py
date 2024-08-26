@@ -410,36 +410,37 @@ class _UnixWaker(_FDWaker):
 
 if platformType == "posix":
     _Waker = _UnixWaker
+
+    class _SIGCHLDWaker(_FDWaker):
+        """
+        L{_SIGCHLDWaker} can wake up a reactor whenever C{SIGCHLD} is received.
+        """
+
+        def install(self) -> None:
+            """
+            Install the handler necessary to make this waker active.
+            """
+            installHandler(self.o)
+
+        def uninstall(self) -> None:
+            """
+            Remove the handler which makes this waker active.
+            """
+            installHandler(-1)
+
+        def doRead(self) -> None:
+            """
+            Having woken up the reactor in response to receipt of
+            C{SIGCHLD}, reap the process which exited.
+
+            This is called whenever the reactor notices the waker pipe is
+            writeable, which happens soon after any call to the C{wakeUp}
+            method.
+            """
+            super().doRead()
+            process.reapAllProcesses()
+
+
 else:
     # Primarily Windows and Jython.
     _Waker = _SocketWaker  # type: ignore[misc,assignment]
-
-
-class _SIGCHLDWaker(_FDWaker):
-    """
-    L{_SIGCHLDWaker} can wake up a reactor whenever C{SIGCHLD} is received.
-    """
-
-    def install(self) -> None:
-        """
-        Install the handler necessary to make this waker active.
-        """
-        installHandler(self.o)
-
-    def uninstall(self) -> None:
-        """
-        Remove the handler which makes this waker active.
-        """
-        installHandler(-1)
-
-    def doRead(self) -> None:
-        """
-        Having woken up the reactor in response to receipt of
-        C{SIGCHLD}, reap the process which exited.
-
-        This is called whenever the reactor notices the waker pipe is
-        writeable, which happens soon after any call to the C{wakeUp}
-        method.
-        """
-        super().doRead()
-        process.reapAllProcesses()
